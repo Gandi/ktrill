@@ -22,6 +22,10 @@
 #include <linux/if_vlan.h>
 #ifdef CONFIG_TRILL
 #include "rbr_private.h"
+#ifdef CONFIG_TRILL_VNT
+  #define FREE_SKB 1
+  #define KEEP_SKB 0
+#endif
 #endif
 
 #define BR_HASH_BITS 8
@@ -862,6 +866,8 @@ void br_trill_set_enabled(struct net_bridge *br, unsigned long val);
 rx_handler_result_t rbr_handle_frame(struct sk_buff **pskb);
 
 #ifdef CONFIG_TRILL_VNT
+void vni_flood_deliver(struct vni *vni, struct sk_buff *skb,
+		       int freeskb);
 /* rbr_vni.c */
 uint32_t get_port_vni_id(struct net_bridge_port *);
 bool vni_add_port(struct net_bridge_port *, u32);

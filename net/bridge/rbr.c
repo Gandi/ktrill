@@ -326,6 +326,10 @@ static void rbr_encaps(struct sk_buff *skb, u16 egressnick, u16 vid)
 	struct sk_buff *skb2;
 	struct rbr *rbr;
 	struct net_bridge_port *p;
+#ifdef CONFIG_TRILL_VNT
+	struct vni *vni;
+	u32 vni_id;
+#endif
 
 	p = br_port_get_rcu(skb->dev);
 	if (unlikely(!p)) {
@@ -373,6 +377,13 @@ static void rbr_encaps(struct sk_buff *skb, u16 egressnick, u16 vid)
 			    ("rbr_encaps_prepare: skb_clone failed\n");
 			goto encaps_drop;
 		}
+#ifdef CONFIG_TRILL_VNT
+		vni_id = get_port_vni_id(p);
+		if (vni_id) {
+			vni = find_vni(p->br, vni_id);
+			vni_flood_deliver(vni, skb2, FREE_SKB);
+		} else
+#endif
 		br_flood_deliver_flags(p->br, skb2, true, TRILL_FLAG_ACCESS);
 		if (unlikely(add_header(skb, local_nick, dtnick, 1)))
 			goto encaps_drop;
@@ -670,6 +681,12 @@ rx_handler_result_t rbr_handle_frame(struct sk_buff **pskb)
 		dst = __br_fdb_get(br, eth_hdr(skb)->h_dest, vid);
 		if (likely(dst)) {
 			if (dst->dst->trill_flag & TRILL_FLAG_ACCESS) {
+				# ifdef CONFIG_TRILL_VNT
+				if (get_port_vni_id(p) !=
+				    get_port_vni_id(dst->dst))
+					goto drop;
+				else
+				#endif
 				br_deliver(dst->dst, skb);
 				return RX_HANDLER_CONSUMED;
 			}

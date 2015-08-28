@@ -249,6 +249,50 @@ void br_flood_deliver(struct net_bridge *br, struct sk_buff *skb, bool unicast)
 	br_flood_deliver_flags(br, skb, unicast, false);
 }
 
+#ifdef CONFIG_TRILL_VNT
+static void vni_flood(struct vni *vni, struct sk_buff *skb,
+		      void (*__packet_hook)(const struct net_bridge_port *p,
+					    struct sk_buff *skb
+					   ),
+		      int freeskb
+		     )
+{
+	struct net_bridge_port *p;
+	struct net_bridge_port *prev;
+
+	prev = NULL;
+	list_for_each_entry_rcu(p, &vni->port_list, list2) {
+		if (should_deliver(p, skb)) {
+			if (prev) {
+				struct sk_buff *skb2;
+
+				skb2 = skb_clone(skb, GFP_ATOMIC);
+				if (!skb2) {
+					vni->br->dev->stats.tx_dropped++;
+					kfree_skb(skb);
+					return;
+				}
+
+				__packet_hook(prev, skb2);
+			}
+
+			prev = p;
+		}
+	}
+
+	if (prev) {
+		__packet_hook(prev, skb);
+		return;
+	}
+	if (freeskb == FREE_SKB)
+		kfree_skb(skb);
+}
+
+void vni_flood_deliver(struct vni *vni, struct sk_buff *skb, int freeskb)
+{
+	vni_flood(vni, skb, __br_deliver, freeskb);
+}
+#endif
 #else
 void br_flood_deliver(struct net_bridge *br, struct sk_buff *skb, bool unicast)
 {
