@@ -730,6 +730,11 @@ static const struct nla_policy br_policy[IFLA_BR_MAX + 1] = {
 	[IFLA_BR_AGEING_TIME] = { .type = NLA_U32 },
 	[IFLA_BR_STP_STATE] = { .type = NLA_U32 },
 	[IFLA_BR_PRIORITY] = { .type = NLA_U16 },
+#ifdef CONFIG_TRILL
+	[IFLA_TRILL_NICKNAME]   = { .type = NLA_U16 },
+	[IFLA_TRILL_ROOT]       = { .type = NLA_U16 },
+	[IFLA_TRILL_INFO]       = { .type = NLA_BINARY },
+#endif
 };
 
 static int br_changelink(struct net_device *brdev, struct nlattr *tb[],
@@ -776,8 +781,11 @@ static int br_changelink(struct net_device *brdev, struct nlattr *tb[],
 
 		br_stp_set_bridge_priority(br, priority);
 	}
+#ifdef CONFIG_TRILL
+	err = rbr_set_data(brdev, tb, data);
+#endif
 
-	return 0;
+	return err;
 }
 
 static size_t br_get_size(const struct net_device *brdev)

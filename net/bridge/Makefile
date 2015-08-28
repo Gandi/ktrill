@@ -22,4 +22,4 @@ bridge-$(CONFIG_BRIDGE_VLAN_FILTERING) += br_vlan.o
 
 obj-$(CONFIG_NETFILTER) += netfilter/
 
-bridge-$(CONFIG_TRILL) += rbr.o
+bridge-$(CONFIG_TRILL) += rbr.o rbr_rtnetlink.o

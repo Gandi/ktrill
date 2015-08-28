@@ -864,6 +864,12 @@ int br_dellink(struct net_device *dev, struct nlmsghdr *nlmsg, u16 flags);
 int br_getlink(struct sk_buff *skb, u32 pid, u32 seq, struct net_device *dev,
 	       u32 filter_mask, int nlflags);
 
+#ifdef CONFIG_TRILL
+/* rbr_netlink.c */
+int rbr_set_data(struct net_device *dev, struct nlattr *tb[],
+		 struct nlattr *data[]);
+#endif
+
 #ifdef CONFIG_SYSFS
 /* br_sysfs_if.c */
 extern const struct sysfs_ops brport_sysfs_ops;
