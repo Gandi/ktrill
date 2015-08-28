@@ -860,7 +860,17 @@ ssize_t br_show_bridge_id(char *buf, const struct bridge_id *id);
 #ifdef CONFIG_TRILL
 void br_trill_set_enabled(struct net_bridge *br, unsigned long val);
 rx_handler_result_t rbr_handle_frame(struct sk_buff **pskb);
-#endif
+
+#ifdef CONFIG_TRILL_VNT
+/* rbr_vni.c */
+uint32_t get_port_vni_id(struct net_bridge_port *);
+bool vni_add_port(struct net_bridge_port *, u32);
+void vni_del_port(struct net_bridge_port *);
+void del_vni(struct vni *);
+struct vni *find_vni(struct net_bridge *, u32);
+#endif /* CONFIG_TRILL_VNT */
+#endif /* CONFIG_TRILL */
+
 
 /* br_stp_bpdu.c */
 struct stp_proto;

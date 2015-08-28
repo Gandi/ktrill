@@ -245,6 +245,10 @@ static void del_nbp(struct net_bridge_port *p)
 	spin_unlock_bh(&br->lock);
 
 	br_ifinfo_notify(RTM_DELLINK, p);
+#ifdef CONFIG_TRILL_VNT
+	if (p->vni)
+		vni_del_port(p);
+#endif
 
 	list_del_rcu(&p->list);
 
@@ -273,10 +277,18 @@ void br_dev_delete(struct net_device *dev, struct list_head *head)
 {
 	struct net_bridge *br = netdev_priv(dev);
 	struct net_bridge_port *p, *n;
+#ifdef CONFIG_TRILL_VNT
+	struct vni *vni, *tmp;
+#endif
 
 	list_for_each_entry_safe(p, n, &br->port_list, list) {
 		del_nbp(p);
 	}
+#ifdef CONFIG_TRILL_VNT
+	list_for_each_entry_safe(vni, tmp, &br->vni_list, list) {
+		del_vni(vni);
+	}
+#endif
 
 	br_fdb_delete_by_port(br, NULL, 0, 1);
 
