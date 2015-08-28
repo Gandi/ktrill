@@ -13,6 +13,7 @@
  */
 #include "br_private.h"
 #include "rbr_private.h"
+static void rbr_del_all(struct rbr *rbr);
 
 static struct rbr *add_rbr(struct net_bridge *br)
 {
@@ -55,8 +56,10 @@ static void br_trill_stop(struct net_bridge *br)
 	spin_unlock_bh(&br->lock);
 	old = br->rbr;
 	br->rbr = NULL;
-	if (likely(old))
+	if (likely(old)) {
+		rbr_del_all(old);
 		kfree(old);
+	}
 }
 
 void br_trill_set_enabled(struct net_bridge *br, unsigned long val)
