@@ -68,3 +68,11 @@ config TRILL
 	---help---
 	  enable trill option on bridge to get Rbridge
 	  If unsure, say N.
+
+config TRILL_VNT
+	bool "Enable VNT capabilities on Rbridge (EXPERIMENTAL)"
+	depends on TRILL
+	default n
+	---help---
+	  enable VNT option on rbridge to get virtual networks
+	  If unsure, say N.
