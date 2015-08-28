@@ -44,6 +44,8 @@ struct rbr {
 	struct net_bridge *br;	/* back pointer */
 };
 
+int set_treeroot(struct rbr *rbr, uint16_t treeroot);
+
 /* Access the adjacency nick list at the end of rbr_nickinfo */
 #define	RBR_NI_ADJNICKSPTR(v) ((u16 *)((struct rbr_nickinfo *)(v) + 1))
 #define	RBR_NI_ADJNICK(v, n) (RBR_NI_ADJNICKSPTR(v)[(n)])

@@ -69,3 +69,15 @@ void br_trill_set_enabled(struct net_bridge *br, unsigned long val)
 			br_trill_stop(br);
 	}
 }
+
+int set_treeroot(struct rbr *rbr, uint16_t treeroot)
+{
+	if (unlikely(!VALID_NICK(treeroot))) {
+		pr_warn_ratelimited
+			("rbr_set_treeroot: given tree root not valid\n");
+		return -ENOENT;
+	}
+	if (rbr->treeroot != treeroot)
+		rbr->treeroot = treeroot;
+	return 0;
+}

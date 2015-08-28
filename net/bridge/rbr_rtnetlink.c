@@ -27,7 +27,7 @@ int rbr_set_data(struct net_device *dev, struct nlattr *tb[],
 		return -EINVAL;
 
 	if (data[IFLA_TRILL_NICKNAME]) {
-		nick =  nla_get_u16(data[IFLA_TRILL_NICKNAME]);
+		nick = nla_get_u16(data[IFLA_TRILL_NICKNAME]);
 		if (br->trill_enabled == BR_NO_TRILL)
 			br_trill_set_enabled(br, 1);
 
@@ -35,6 +35,12 @@ int rbr_set_data(struct net_device *dev, struct nlattr *tb[],
 		if (VALID_NICK(nick))
 			br->rbr->nick = htons(nick);
 		spin_unlock_bh(&br->lock);
+	}
+	if (data[IFLA_TRILL_ROOT]) {
+		if (!br->rbr)
+			return -EINVAL;
+		nick = nla_get_u16(data[IFLA_TRILL_ROOT]);
+		err = set_treeroot(br->rbr, htons(nick));
 	}
 
 	return 0;
