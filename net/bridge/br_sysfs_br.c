@@ -146,6 +146,41 @@ static ssize_t stp_state_store(struct device *d,
 }
 static DEVICE_ATTR_RW(stp_state);
 
+#ifdef CONFIG_TRILL
+static ssize_t trill_state_show(struct device *d,
+				struct device_attribute *attr, char *buf)
+{
+	struct net_bridge *br = to_bridge(d);
+
+	return sprintf(buf, "%d\n", br->trill_enabled);
+}
+
+static ssize_t trill_state_store(struct device *d,
+				 struct device_attribute *attr, const char *buf,
+				 size_t len)
+{
+	struct net_bridge *br = to_bridge(d);
+	int err;
+	unsigned long val;
+
+	if (!ns_capable(dev_net(br->dev)->user_ns, CAP_NET_ADMIN))
+		return -EPERM;
+
+	err = kstrtoul(buf, 0, &val);
+	if (err)
+		return err;
+
+	if (!rtnl_trylock())
+		return restart_syscall();
+	br_trill_set_enabled(br, val);
+	rtnl_unlock();
+
+	return len;
+}
+
+static DEVICE_ATTR_RW(trill_state);
+#endif
+
 static ssize_t group_fwd_mask_show(struct device *d,
 				   struct device_attribute *attr,
 				   char *buf)
@@ -749,6 +784,9 @@ static struct attribute *bridge_attrs[] = {
 	&dev_attr_max_age.attr,
 	&dev_attr_ageing_time.attr,
 	&dev_attr_stp_state.attr,
+#ifdef CONFIG_TRILL
+	&dev_attr_trill_state.attr,
+#endif
 	&dev_attr_group_fwd_mask.attr,
 	&dev_attr_priority.attr,
 	&dev_attr_bridge_id.attr,

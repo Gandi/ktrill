@@ -137,6 +137,29 @@ static ssize_t show_port_state(struct net_bridge_port *p, char *buf)
 }
 static BRPORT_ATTR(state, S_IRUGO, show_port_state, NULL);
 
+#ifdef CONFIG_TRILL
+
+static ssize_t show_port_trill_state(struct net_bridge_port *p, char *buf)
+{
+	return sprintf(buf, "%d\n", p->trill_flag);
+}
+
+static int store_port_trill_state(struct net_bridge_port *p,  unsigned long v)
+{
+	u8 val;
+
+	if (!ns_capable(dev_net(p->dev)->user_ns, CAP_NET_ADMIN))
+		return -EPERM;
+	val = (u8)v;
+	if (val > TRILL_FLAG_TRUNK)
+		return -ERANGE;
+	p->trill_flag = val;
+	return 0;
+}
+static BRPORT_ATTR(trill_state, S_IRUGO | S_IWUSR, show_port_trill_state,
+				   store_port_trill_state);
+#endif
+
 static ssize_t show_message_age_timer(struct net_bridge_port *p,
 					    char *buf)
 {
@@ -200,6 +223,9 @@ static const struct brport_attribute *brport_attrs[] = {
 	&brport_attr_designated_port,
 	&brport_attr_designated_cost,
 	&brport_attr_state,
+#ifdef CONFIG_TRILL
+	&brport_attr_trill_state,
+#endif
 	&brport_attr_change_ack,
 	&brport_attr_config_pending,
 	&brport_attr_message_age_timer,
