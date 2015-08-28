@@ -20,6 +20,9 @@
 #include <net/route.h>
 #include <net/ip6_fib.h>
 #include <linux/if_vlan.h>
+#ifdef CONFIG_TRILL
+#include "rbr_private.h"
+#endif
 
 #define BR_HASH_BITS 8
 #define BR_HASH_SIZE (1 << BR_HASH_BITS)
@@ -31,6 +34,19 @@
 #define BR_VLAN_BITMAP_LEN	BITS_TO_LONGS(VLAN_N_VID)
 
 #define BR_VERSION	"2.3"
+
+#ifdef CONFIG_TRILL
+  /* TRILL flagged ports are ports where we expect
+   * receiving native layer 2 frames
+   */
+#define TRILL_FLAG_DISABLE	0x1
+#define TRILL_FLAG_P2P		0x2
+#define TRILL_FLAG_ACCESS	0x4
+#define TRILL_FLAG_TRUNK	0x8	/* DROP ALL native L2 frame */
+/* Bridge TRILL state */
+#define BR_NO_TRILL		0	/* no trill  */
+#define BR_TRILL		1	/* trill enabled */
+#endif
 
 /* Control of forwarding link local multicast */
 #define BR_GROUPFWD_DEFAULT	0
@@ -165,6 +181,11 @@ struct net_bridge_port
 	struct rcu_head			rcu;
 
 	unsigned long 			flags;
+	/* Trill */
+#ifdef CONFIG_TRILL
+	u8				trill_flag;
+#endif /* CONFIG_TRILL */
+
 
 #ifdef CONFIG_BRIDGE_IGMP_SNOOPING
 	struct bridge_mcast_own_query	ip4_own_query;
@@ -247,6 +268,11 @@ struct net_bridge
 		BR_KERNEL_STP,		/* old STP in kernel */
 		BR_USER_STP,		/* new RSTP in userspace */
 	} stp_enabled;
+
+#ifdef CONFIG_TRILL
+	bool				trill_enabled;
+	struct rbr			*rbr;
+#endif
 
 	unsigned char			topology_change;
 	unsigned char			topology_change_detected;
