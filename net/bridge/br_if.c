@@ -345,6 +345,9 @@ static struct net_bridge_port *new_nbp(struct net_bridge *br,
 	p->flags = BR_LEARNING | BR_FLOOD;
 	br_init_port(p);
 	br_set_state(p, BR_STATE_DISABLED);
+#ifdef CONFIG_TRILL
+	 p->trill_flag = TRILL_FLAG_TRUNK;
+#endif
 	br_stp_port_timer_init(p);
 	br_multicast_add_port(p);
 
