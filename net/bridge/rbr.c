@@ -142,8 +142,26 @@ static bool add_header(struct sk_buff *skb, uint16_t ingressnick,
 	size_t trhsize;
 	u16 vlan_tci;
 	u16 trill_flags = 0;
+#ifdef CONFIG_TRILL_VNT
+	struct trill_opt *trill_opt;
+	struct trill_vnt_extension *vnt;
+	struct net_bridge_port *p;
+	u32 vni = 0;
+	u16 vnt_flags = 0;
+	u32 opt_flows = 0;
+	u32 opt_flags = 0;
+#endif
 
 	trhsize = sizeof(*trh);
+#ifdef CONFIG_TRILL_VNT
+	p = br_port_get_rcu(skb->dev);
+	if (p)
+		vni = get_port_vni_id(p);
+	if (vni)
+		trhsize += sizeof(struct trill_opt) +
+			   sizeof(struct trill_vnt_extension);
+#endif
+
 	skb_push(skb, ETH_HLEN);
 	if (!skb->encapsulation) {
 		skb_reset_inner_headers(skb);
@@ -163,6 +181,31 @@ static bool add_header(struct sk_buff *skb, uint16_t ingressnick,
 		pr_err("add_header: cow_head failed\n");
 		return 1;
 	}
+#ifdef CONFIG_TRILL_VNT
+	if (vni) {
+		vnt = (struct trill_vnt_extension *)skb_push(skb,
+							     sizeof(*vnt));
+		trill_opt = (struct trill_opt *)skb_push(skb,
+							 sizeof(*trill_opt));
+		/* opt_flags to be defined later */
+		trill_opt->opt_flag = htonl(opt_flags);
+		/* opt_flows will be used for multipath */
+		trill_opt->opt_flow = htonl(opt_flows);
+		vnt_flags = vnt_flags |
+			trill_extension_set_app(0) |
+			trill_extension_set_nc(0) |
+			trill_extension_set_type(VNT_EXTENSION_TYPE) |
+			trill_extension_set_mu(0) |
+			trill_extension_set_length(VNT_EXTENSION_LENGTH);
+		vnt->flags = htons(vnt_flags);
+		vnt->reserved_high = htons(0);
+		trill_extension_set_vni(vnt, vni_to_network(vni));
+		trill_flags = trill_set_optslen(trill_flags,
+						sizeof(*trill_opt) +
+						sizeof(*vnt)
+						);
+	}
+#endif
 
 	trh = (struct trill_hdr *)skb_push(skb, sizeof(*trh));
 	trill_flags = trill_set_version(trill_flags, TRILL_PROTOCOL_VERS);
