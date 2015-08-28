@@ -457,6 +457,10 @@ int br_forward_finish(struct sock *sk, struct sk_buff *skb);
 void br_flood_deliver(struct net_bridge *br, struct sk_buff *skb, bool unicast);
 void br_flood_forward(struct net_bridge *br, struct sk_buff *skb,
 		      struct sk_buff *skb2, bool unicast);
+void br_flood_deliver_flags(struct net_bridge *br, struct sk_buff *skb,
+			    bool unicast, uint8_t flags);
+void br_flood_forward_flags(struct net_bridge *br, struct sk_buff *skb,
+			    struct sk_buff *skb2, bool unicast, uint8_t flags);
 
 /* br_if.c */
 void br_port_carrier_check(struct net_bridge_port *p);
