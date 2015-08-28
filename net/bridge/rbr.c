@@ -443,7 +443,12 @@ static void rbr_encaps(struct sk_buff *skb, u16 egressnick, u16 vid)
 	kfree_skb(skb);
 }
 
+#ifdef CONFIG_TRILL_VNT
+static void rbr_decap_finish(struct sk_buff *skb, u16 vid,
+			     uint32_t vni)
+#else
 static void rbr_decap_finish(struct sk_buff *skb, u16 vid)
+#endif
 {
 	struct net_bridge *br;
 	struct net_bridge_port *p;
@@ -453,11 +458,34 @@ static void rbr_decap_finish(struct sk_buff *skb, u16 vid)
 	p = br_port_get_rcu(skb->dev);
 	br = p->br;
 	dst = __br_fdb_get(br, dest, vid);
-	if (likely(dst))
-		br_deliver(dst->dst, skb);
-	else
-		/* destination unknown flood on all access ports */
-		br_flood_deliver_flags(br, skb, true, TRILL_FLAG_ACCESS);
+	if (dst) {
+	#ifdef CONFIG_TRILL_VNT
+		if (get_port_vni_id(dst->dst) != vni)
+			goto rbr_decap_finish_drop;
+		else
+	#endif
+			br_deliver(dst->dst, skb);
+	} else {
+		#ifdef CONFIG_TRILL_VNT
+		if (vni) {
+			struct vni *VNI;
+
+			VNI = find_vni(br, vni);
+			if (VNI)
+				vni_flood_deliver(VNI, skb, FREE_SKB);
+			else
+				goto rbr_decap_finish_drop;
+		} else
+		#endif
+			do {
+				br_flood_deliver_flags(p->br, skb, true,
+						       TRILL_FLAG_ACCESS
+						      );
+			} while (0);
+	}
+	return;
+rbr_decap_finish_drop:
+	kfree_skb(skb);
 }
 
 static void rbr_decaps(struct net_bridge_port *p,
@@ -465,6 +493,9 @@ static void rbr_decaps(struct net_bridge_port *p,
 {
 	struct trill_hdr *trh;
 	struct ethhdr *hdr;
+#ifdef CONFIG_TRILL_VNT
+	u32 vni = 0;
+#endif
 
 	if (unlikely(!p))
 		goto rbr_decaps_drop;
@@ -474,6 +505,34 @@ static void rbr_decaps(struct net_bridge_port *p,
 	else
 		goto rbr_decaps_drop;
 	trhsize -= sizeof(*trh);
+#ifdef CONFIG_TRILL_VNT
+	if (trill_get_optslen(ntohs(trh->th_flags))) {
+		struct trill_vnt_extension *vnt;
+
+		if (trhsize > sizeof(struct trill_opt))
+			skb_pull(skb, sizeof(struct trill_opt));
+		else
+			goto rbr_decaps_drop;
+		trhsize -= sizeof(struct trill_opt);
+		vnt = (struct trill_vnt_extension *)skb->data;
+		if (trill_extension_get_type(vnt->flags !=
+					     VNT_EXTENSION_TYPE)) {
+			kfree_skb(skb);
+			return;
+		}
+		vni = network_to_vni((uint32_t)trill_extension_get_vni(vnt));
+		if (trhsize >= sizeof(*vnt))
+			skb_pull(skb, sizeof(*vnt));
+		else
+			goto rbr_decaps_drop;
+		trhsize -= sizeof(*vnt);
+		if (trhsize > 0) {
+			pr_warn_ratelimited("unknown option encountred dropping frame for safety\n");
+			goto rbr_decaps_drop;
+		}
+	}
+#endif
+
 	skb_reset_mac_header(skb);	/* instead of the inner one */
 	skb->protocol = eth_hdr(skb)->h_proto;
 	hdr = (struct ethhdr *)skb->data;
@@ -483,7 +542,11 @@ static void rbr_decaps(struct net_bridge_port *p,
 		skb->encapsulation = 0;
 	br_fdb_update_nick(p->br, p, hdr->h_source, vid, false,
 			   trh->th_ingressnick);
+#ifdef CONFIG_TRILL_VNT
+	rbr_decap_finish(skb, vid, vni);
+#else
 	rbr_decap_finish(skb, vid);
+#endif
 	return;
  rbr_decaps_drop:
 	if (likely(p && p->br))
