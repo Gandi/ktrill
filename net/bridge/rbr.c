@@ -13,6 +13,7 @@
  */
 #include "br_private.h"
 #include "rbr_private.h"
+#include <linux/netfilter_bridge.h>
 static void rbr_del_all(struct rbr *rbr);
 
 static struct rbr *add_rbr(struct net_bridge *br)
@@ -118,4 +119,95 @@ static void rbr_del_all(struct rbr *rbr)
 		if (likely(rbr->rbr_nodes[i]))
 			rbr_del_node(rbr, i);
 	}
+}
+
+/* handling function hook allow handling
+ * a frame upon reception called via
+ * br_handle_frame_hook = rbr_handle_frame
+ * in  br.c
+ * Return NULL if skb is handled
+ * note: already called with rcu_read_lock
+ */
+rx_handler_result_t rbr_handle_frame(struct sk_buff **pskb)
+{
+	struct net_bridge *br;
+	struct net_bridge_port *p;
+	struct sk_buff *skb = *pskb;
+	u16 vid = 0;
+
+	p = br_port_get_rcu(skb->dev);
+	br = p->br;
+	if (!br || !br->rbr)
+		goto drop_no_stat;
+
+	if (unlikely(skb->pkt_type == PACKET_LOOPBACK))
+		return RX_HANDLER_PASS;
+	skb = skb_share_check(skb, GFP_ATOMIC);
+	if (!skb)
+		return RX_HANDLER_CONSUMED;
+	if (unlikely(!is_valid_ether_addr(eth_hdr(skb)->h_source))) {
+		pr_warn_ratelimited("rbr_handle_frame: invalid src address\n");
+		goto drop;
+	}
+	if (!br_allowed_ingress(p->br, nbp_get_vlan_info(p), skb, &vid))
+		goto drop;
+	/* do not handle any BPDU from the moment */
+	if (is_all_rbr_address((const u8 *)&eth_hdr(skb)->h_dest)) {
+		br_fdb_update(br, p, eth_hdr(skb)->h_source, vid, false);
+		/* BPDU has to be dropped */
+		goto drop_no_stat;
+	}
+	/* DROP if port is in disable state */
+	if (p->trill_flag & TRILL_FLAG_DISABLE)
+		goto drop;
+	/* ACCESS port encapsulate packets */
+	if (p->trill_flag & TRILL_FLAG_ACCESS) {
+		/* check if destination is connected on the same bridge */
+		struct net_bridge_fdb_entry *dst;
+
+		dst = __br_fdb_get(br, eth_hdr(skb)->h_dest, vid);
+		if (likely(dst)) {
+			if (dst->dst->trill_flag & TRILL_FLAG_ACCESS) {
+				br_deliver(dst->dst, skb);
+				return RX_HANDLER_CONSUMED;
+			}
+		}
+
+		/* if packet is from access port and trill is enabled and dest
+		 * is not an access port or is unknown, encaps it
+		 */
+		/* TODO */
+		return RX_HANDLER_CONSUMED;
+	}
+	if (p->trill_flag & TRILL_FLAG_TRUNK) {
+		/* packet is from trunk port and trill is enabled */
+		if (eth_hdr(skb)->h_proto == htons(ETH_P_TRILL)) {
+			/* Packet is from trunk port, decapsulate
+			 * if destined to access port
+			 * or trill forward to next hop
+			 */
+			/* TODO */
+			return RX_HANDLER_CONSUMED;
+		}
+		/* packet is destinated to localhost */
+		if (ether_addr_equal(p->br->dev->dev_addr,
+				     eth_hdr(skb)->h_dest)) {
+			skb->pkt_type = PACKET_HOST;
+			NF_HOOK(NFPROTO_BRIDGE, NF_BR_PRE_ROUTING, NULL, skb,
+				skb->dev, NULL,
+				br_handle_frame_finish);
+			return RX_HANDLER_CONSUMED;
+		}
+
+		/* packet is not from trill  we don't handle
+		 * such packet from the moment
+		 */
+	}
+
+ drop:
+	if (br->dev)
+		br->dev->stats.rx_dropped++;
+ drop_no_stat:
+	kfree_skb(skb);
+	return RX_HANDLER_CONSUMED;
 }

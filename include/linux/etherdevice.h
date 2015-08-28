@@ -58,6 +58,10 @@ int eth_gro_complete(struct sk_buff *skb, int nhoff);
 /* Reserved Ethernet Addresses per IEEE 802.1Q */
 static const u8 eth_reserved_addr_base[ETH_ALEN] __aligned(2) =
 { 0x01, 0x80, 0xc2, 0x00, 0x00, 0x00 };
+#ifdef CONFIG_TRILL
+static const u8 eth_reserved_addr_all_rbridge[ETH_ALEN] __aligned(2) = {
+0x01, 0x80, 0xc2, 0x00, 0x00, 0x40};
+#endif
 
 /**
  * is_link_local_ether_addr - Determine if given Ethernet address is link-local
@@ -446,5 +450,18 @@ static inline int eth_skb_pad(struct sk_buff *skb)
 {
 	return skb_put_padto(skb, ETH_ZLEN);
 }
+
+#ifdef CONFIG_TRILL
+/**
+ * is_all_rbr_address - check if it is a specific Rbridge brodcast mac address
+ * @addr: Pointer to a six-byte array containing the Ethernet address
+ *
+ * returns true if it is a RBridge brodcast address 01:80:C2:00:00:40
+ */
+static inline bool is_all_rbr_address(const u8 *addr)
+{
+	return ether_addr_equal(addr, eth_reserved_addr_all_rbridge);
+}
+#endif
 
 #endif	/* _LINUX_ETHERDEVICE_H */
