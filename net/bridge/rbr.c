@@ -170,6 +170,48 @@ static bool add_header(struct sk_buff *skb, uint16_t ingressnick,
 	return 0;
 }
 
+static void rbr_fwd(struct net_bridge_port *p, struct sk_buff *skb,
+		    u16 adj_nick, u16 vid)
+{
+	struct rbr_node *adj;
+	struct trill_hdr *trh;
+	struct ethhdr *outerethhdr;
+	struct net *net = dev_net(p->dev);
+	struct net_device *outdev;
+	struct net_bridge_port *outp;
+
+	adj = rbr_find_node(p->br->rbr, adj_nick);
+	if (unlikely(!adj || !adj->rbr_ni)) {
+		pr_warn_ratelimited("rbr_fwd: unable to find adjacent RBridge\n");
+		goto dest_fwd_fail;
+	}
+	outdev = dev_get_by_index_rcu(net, adj->rbr_ni->linkid);
+	if (!outdev) {
+		pr_warn_ratelimited("rbr_fwd: cannot find source port device for forwrding\n");
+		goto dest_fwd_fail;
+	}
+
+	trh = (struct trill_hdr *)skb->data;
+	trillhdr_dec_hopcount(trh);
+	outerethhdr = eth_hdr(skb);
+
+	/* change outer ether header */
+	/* bridge becomes the source_port address in outeretherhdr */
+	outp = br_port_get_rcu(outdev);
+	ether_addr_copy(outerethhdr->h_source, outp->dev->dev_addr);
+	/* dist port becomes dest address in outeretherhdr */
+	ether_addr_copy(outerethhdr->h_dest, adj->rbr_ni->adjsnpa);
+	rbr_node_put(adj);
+	skb->dev = p->br->dev;
+	br_forward(outp, skb, NULL);
+	return;
+
+dest_fwd_fail:
+	if (likely(p && p->br))
+		p->br->dev->stats.tx_dropped++;
+	kfree_skb(skb);
+}
+
 static void rbr_encaps(struct sk_buff *skb, u16 egressnick, u16 vid)
 {
 	u16 local_nick;
@@ -232,7 +274,7 @@ static void rbr_encaps(struct sk_buff *skb, u16 egressnick, u16 vid)
 	} else {
 		if (unlikely(add_header(skb, local_nick, egressnick, 0)))
 			goto encaps_drop;
-		/* TODO simple forwarding */
+		rbr_fwd(p, skb, egressnick, vid);
 	}
 	return;
  encaps_drop:
@@ -371,7 +413,7 @@ static void rbr_recv(struct sk_buff *skb, u16 vid)
 		} else if (likely(trill_get_hopcount(trill_flags))) {
 			br_fdb_update(p->br, p, eth_hdr(skb)->h_source,
 				      vid, false);
-			/* TODO simple forwarding */
+			rbr_fwd(p, skb, trh->th_egressnick, vid);
 		} else {
 			pr_warn_ratelimited("rbr_recv: hop count limit reached\n");
 			goto recv_drop;
