@@ -834,6 +834,11 @@ int br_stp_set_port_priority(struct net_bridge_port *p, unsigned long newprio);
 int br_stp_set_path_cost(struct net_bridge_port *p, unsigned long path_cost);
 ssize_t br_show_bridge_id(char *buf, const struct bridge_id *id);
 
+/* rbr.c */
+#ifdef CONFIG_TRILL
+void br_trill_set_enabled(struct net_bridge *br, unsigned long val);
+#endif
+
 /* br_stp_bpdu.c */
 struct stp_proto;
 void br_stp_rcv(const struct stp_proto *proto, struct sk_buff *skb,
