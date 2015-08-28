@@ -49,6 +49,7 @@
 #define ETH_P_IEEEPUP	0x0a00		/* Xerox IEEE802.3 PUP packet */
 #define ETH_P_IEEEPUPAT	0x0a01		/* Xerox IEEE802.3 PUP Addr Trans packet */
 #define ETH_P_TRILL	0x22F3		/* TRILL frames RFC 6325 */
+#define ETH_P_L2_ISIS	0x22F4		/* L2-IS-IS frames RFC 6325 */
 #define ETH_P_BATMAN	0x4305		/* B.A.T.M.A.N.-Advanced packet [ NOT AN OFFICIALLY REGISTERED ID ] */
 #define ETH_P_DEC       0x6000          /* DEC Assigned proto           */
 #define ETH_P_DNA_DL    0x6001          /* DEC DNA Dump/Load            */
