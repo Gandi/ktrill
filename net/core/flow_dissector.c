@@ -18,6 +18,9 @@
 #include <linux/mpls.h>
 #include <net/flow_dissector.h>
 #include <scsi/fc/fc_fcoe.h>
+#ifdef CONFIG_TRILL
+#include <net/if_trill.h>
+#endif
 
 static bool skb_flow_dissector_uses_key(struct flow_dissector *flow_dissector,
 					enum flow_dissector_key_id key_id)
@@ -165,6 +168,34 @@ bool __skb_flow_dissect(const struct sk_buff *skb,
 
 again:
 	switch (proto) {
+#ifdef CONFIG_TRILL
+	case htons(ETH_P_TRILL): {
+		const struct trill_hdr *trillh;
+		struct trill_hdr _trillh;
+		const struct ethhdr *eth;
+		struct ethhdr _eth;
+		u8 trill_op_len;
+
+		trillh = __skb_header_pointer(skb, nhoff, sizeof(_trillh),
+					      data, hlen, &_trillh);
+		if (!trillh)
+			return false;
+		nhoff += sizeof(*trillh);
+		trill_op_len = trill_get_optslen(ntohs(trillh->th_flags));
+		if (trill_op_len)
+			nhoff += trill_op_len;
+
+		eth = __skb_header_pointer(skb, nhoff, sizeof(_eth), data,
+					   hlen, &_eth);
+		if (!eth)
+			return false;
+		proto = eth->h_proto;
+		nhoff += sizeof(*eth);
+
+		/* handle any vlan tag if present */
+		goto again;
+	}
+#endif
 	case htons(ETH_P_IP): {
 		const struct iphdr *iph;
 		struct iphdr _iph;
