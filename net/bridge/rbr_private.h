@@ -2,6 +2,9 @@
 #define _RBR_PRIVATE_H
 
 #include <linux/atomic.h>
+#ifdef CONFIG_TRILL_VNT
+#include "rbr_vni_private.h"
+#endif
 
 #define	RBRIDGE_NICKNAME_MIN	0x0000
 #define	RBRIDGE_NICKNAME_MAX	0xFFFF

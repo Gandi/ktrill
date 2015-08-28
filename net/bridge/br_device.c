@@ -376,6 +376,9 @@ void br_dev_setup(struct net_device *dev)
 	br->dev = dev;
 	spin_lock_init(&br->lock);
 	INIT_LIST_HEAD(&br->port_list);
+#ifdef CONFIG_TRILL_VNT
+	INIT_LIST_HEAD(&br->vni_list);
+#endif
 	spin_lock_init(&br->hash_lock);
 
 	br->bridge_id.prio[0] = 0x80;
