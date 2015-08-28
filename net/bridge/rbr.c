@@ -267,10 +267,35 @@ dest_fwd_fail:
 	kfree_skb(skb);
 }
 
+/* test if a node support a particular vni */
+bool node_has_vni(struct rbr_node *adj, u32 id)
+{
+	int vnicount;
+	int i = 0;
+	struct rbr_nickinfo *rbr_ni;
+
+	if (id == 0)
+		return true;
+	if (!adj->rbr_ni)
+		return false;
+	rbr_ni = adj->rbr_ni;
+	vnicount = rbr_ni->vnicount;
+	for (i = 0; i < vnicount; i++) {
+		if (RBR_NI_VNI(rbr_ni, i) == id)
+			return true;
+	}
+	return false;
+}
+
 static int rbr_multidest_fwd(struct net_bridge_port *p,
 			     struct sk_buff *skb, u16 egressnick,
 			     u16 ingressnick, const u8 *saddr,
-			     u16 vid, bool free)
+			     u16 vid, bool free
+#ifdef CONFIG_TRILL_VNT
+			     , u32 vni_id
+
+#endif
+			    )
 {
 	struct rbr *rbr;
 	struct rbr_node *dest;
@@ -314,6 +339,15 @@ static int rbr_multidest_fwd(struct net_bridge_port *p,
 			continue;
 		}
 
+		/* check if next hop support vni unless next hop is
+		 * egressnick
+		*/
+		if (adjnick != egressnick) {
+			if (!(node_has_vni(adj, vni_id))) {
+				rbr_node_put(adj);
+				continue;
+			}
+		}
 		/* save the first found adjacency to avoid coping SKB
 		 * if no other adjacency is found later no frame copy
 		 * will be made if other adjacency will be found frame
@@ -430,7 +464,12 @@ static void rbr_encaps(struct sk_buff *skb, u16 egressnick, u16 vid)
 		br_flood_deliver_flags(p->br, skb2, true, TRILL_FLAG_ACCESS);
 		if (unlikely(add_header(skb, local_nick, dtnick, 1)))
 			goto encaps_drop;
+#ifdef CONFIG_TRILL_VNT
+		rbr_multidest_fwd(p, skb, dtnick, local_nick, NULL, vid, true,
+				  vni_id);
+#else
 		rbr_multidest_fwd(p, skb, dtnick, local_nick, NULL, vid, true);
+#endif
 	} else {
 		if (unlikely(add_header(skb, local_nick, egressnick, 0)))
 			goto encaps_drop;
@@ -553,6 +592,23 @@ static void rbr_decaps(struct net_bridge_port *p,
 		p->br->dev->stats.rx_dropped++;
 	kfree_skb(skb);
 }
+
+#ifdef CONFIG_TRILL_VNT
+static uint32_t get_vni(struct sk_buff *skb)
+{
+	struct trill_hdr *trh;
+	struct trill_vnt_extension *vnt;
+	u32 vni = 0;
+
+	trh = (struct trill_hdr *)skb->data;
+	if (trill_get_optslen(ntohs(trh->th_flags)) >= sizeof(*vnt)) {
+		vnt = (struct trill_vnt_extension *)(skb->data + sizeof(*trh) +
+				sizeof(struct trill_opt));
+		vni = network_to_vni((uint32_t)trill_extension_get_vni(vnt));
+	}
+	return vni;
+}
+#endif
 
 static void rbr_recv(struct sk_buff *skb, u16 vid)
 {
@@ -726,7 +782,11 @@ static void rbr_recv(struct sk_buff *skb, u16 vid)
 	}
 
 	if (rbr_multidest_fwd(p, skb2, trh->th_egressnick, trh->th_ingressnick,
-			      eth_hdr(skb)->h_source, vid, false))
+			      eth_hdr(skb)->h_source, vid, false
+#ifdef CONFIG_TRILL_VNT
+				   , get_vni(skb2)
+#endif
+				   ))
 		goto recv_drop;
 
 	/* Send de-capsulated frame locally */
