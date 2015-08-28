@@ -120,6 +120,9 @@ struct net_bridge_fdb_entry
 					added_by_user:1,
 					added_by_external_learn:1;
 	__u16				vlan_id;
+#ifdef CONFIG_TRILL
+	__u16				nick; /* destination's nickname */
+#endif
 };
 
 struct net_bridge_port_group {
@@ -436,6 +439,14 @@ int br_fdb_external_learn_add(struct net_bridge *br, struct net_bridge_port *p,
 			      const unsigned char *addr, u16 vid);
 int br_fdb_external_learn_del(struct net_bridge *br, struct net_bridge_port *p,
 			      const unsigned char *addr, u16 vid);
+#ifdef CONFIG_TRILL
+void br_fdb_update_nick(struct net_bridge *br,
+			struct net_bridge_port *source,
+			const unsigned char *addr,
+			u16 vid, bool added_by_user, uint16_t nick);
+uint16_t get_nick_from_mac(struct net_bridge_port *p, unsigned char *dest,
+			   u16 vid);
+#endif
 
 /* br_forward.c */
 void br_deliver(const struct net_bridge_port *to, struct sk_buff *skb);

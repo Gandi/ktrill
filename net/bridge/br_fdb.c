@@ -503,6 +503,9 @@ static struct net_bridge_fdb_entry *fdb_create(struct hlist_head *head,
 		fdb->added_by_user = 0;
 		fdb->added_by_external_learn = 0;
 		fdb->updated = fdb->used = jiffies;
+#ifdef CONFIG_TRILL
+		fdb->nick = RBRIDGE_NICKNAME_NONE;
+#endif
 		hlist_add_head_rcu(&fdb->hlist, head);
 	}
 	return fdb;
@@ -552,8 +555,14 @@ int br_fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
 	return ret;
 }
 
+#ifdef CONFIG_TRILL
+void br_fdb_update_nick(struct net_bridge *br, struct net_bridge_port *source,
+			const unsigned char *addr, u16 vid, bool added_by_user,
+			uint16_t nick)
+#else
 void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
 		   const unsigned char *addr, u16 vid, bool added_by_user)
+#endif
 {
 	struct hlist_head *head = &br->hash[br_mac_hash(addr, vid)];
 	struct net_bridge_fdb_entry *fdb;
@@ -587,6 +596,9 @@ void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
 				fdb->added_by_user = 1;
 			if (unlikely(fdb_modified))
 				fdb_notify(br, fdb, RTM_NEWNEIGH);
+#ifdef CONFIG_TRILL
+			fdb->nick = nick;
+#endif
 		}
 	} else {
 		spin_lock(&br->hash_lock);
@@ -604,6 +616,16 @@ void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
 		spin_unlock(&br->hash_lock);
 	}
 }
+
+#ifdef CONFIG_TRILL
+void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
+		   const unsigned char *addr, u16 vid, bool added_by_user)
+{
+	br_fdb_update_nick(br, source, addr, vid, added_by_user,
+			   RBRIDGE_NICKNAME_NONE);
+}
+
+#endif
 
 static int fdb_to_nud(const struct net_bridge_fdb_entry *fdb)
 {
@@ -1076,3 +1098,24 @@ int br_fdb_external_learn_del(struct net_bridge *br, struct net_bridge_port *p,
 
 	return err;
 }
+
+#ifdef CONFIG_TRILL
+/* get_nick_from_mac: used to get correspondant nick to Mac address
+ * used only on ingress/Egress Rbridge (those how encapsulate
+ * and decapsulate frames)
+ * must be called while encapsulating  to get mac <-> nick correspondance
+ */
+uint16_t get_nick_from_mac(struct net_bridge_port *p, unsigned char *dest,
+			   u16 vid)
+{
+	struct hlist_head *head = &p->br->hash[br_mac_hash(dest, vid)];
+	struct net_bridge_fdb_entry *fdb;
+
+	if (is_multicast_ether_addr(dest))
+		return RBRIDGE_NICKNAME_NONE;
+	fdb = fdb_find(head, dest, vid);
+	if (likely(fdb))
+		return fdb->nick;
+	return RBRIDGE_NICKNAME_NONE;
+}
+#endif
