@@ -285,6 +285,29 @@ static int old_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		return ret;
 	}
 
+#ifdef CONFIG_TRILL_VNT
+	case BRCTL_SET_RBRIDGE_PORT_VNI:
+	{
+		struct net_bridge_port *p;
+		u32 id;
+		int ret = 0;
+
+		p = br_get_port(br, args[1]);
+		if (!p) {
+			ret = -EINVAL;
+		} else {
+			if (p->trill_flag != TRILL_FLAG_ACCESS)
+				p->trill_flag = TRILL_FLAG_ACCESS;
+			id = args[2];
+			if (id > 0)
+				ret = vni_add_port(p, id);
+			else
+				vni_del_port(p);
+		}
+		return ret;
+	}
+#endif /* CONFIG_TRILL_VLANLABEL */
+
 	case BRCTL_GET_FDB_ENTRIES:
 		return get_fdb_entries(br, (void __user *)args[1],
 				       args[2], args[3]);
