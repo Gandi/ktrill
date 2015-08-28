@@ -45,7 +45,10 @@
 #define BRCTL_SET_PATH_COST 17
 #define BRCTL_GET_FDB_ENTRIES 18
 #ifdef CONFIG_TRILL_VNT
-#define BRCTL_SET_RBRIDGE_PORT_VNI 19
+#define BRCTL_SET_RBRIDGE_TRILL_STATE 19
+#define BRCTL_SET_RBRIDGE_PORT_VNI 20
+#define BRCTL_GET_VNI_PORT_LIST 21
+#define BRCTL_GET_FDB_ENTRIES_NICK 22
 #endif
 
 #define BR_STATE_DISABLED 0
@@ -101,6 +104,18 @@ struct __fdb_entry {
 	__u8 pad0;
 	__u16 unused;
 };
+
+#ifdef CONFIG_TRILL
+struct __fdb_entry_nick {
+	__u8 mac_addr[6];
+	__u8 port_no;
+	__u8 is_local;
+	__u32 ageing_timer_value;
+	__u8 port_hi;
+	__u8 pad0;
+	__u16 nick;
+};
+#endif
 
 /* Bridge Flags */
 #define BRIDGE_FLAGS_MASTER	1	/* Bridge command to/from master */

@@ -436,6 +436,10 @@ struct net_bridge_fdb_entry *__br_fdb_get(struct net_bridge *br,
 int br_fdb_test_addr(struct net_device *dev, unsigned char *addr);
 int br_fdb_fillbuf(struct net_bridge *br, void *buf, unsigned long count,
 		   unsigned long off);
+#ifdef CONFIG_TRILL
+int br_fdb_fillbuf_nick(struct net_bridge *br, void *buf,
+			unsigned long maxnum, unsigned long skip);
+#endif
 int br_fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
 		  const unsigned char *addr, u16 vid);
 void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,

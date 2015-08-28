@@ -458,6 +458,56 @@ int br_fdb_fillbuf(struct net_bridge *br, void *buf,
 	return num;
 }
 
+#ifdef CONFIG_TRILL
+int br_fdb_fillbuf_nick(struct net_bridge *br, void *buf,
+			unsigned long maxnum, unsigned long skip)
+{
+	struct __fdb_entry_nick *fe = buf;
+	int i, num = 0;
+	struct net_bridge_fdb_entry *f;
+
+	memset(buf, 0, maxnum * sizeof(struct __fdb_entry_nick));
+
+	rcu_read_lock();
+	for (i = 0; i < BR_HASH_SIZE; i++) {
+		hlist_for_each_entry_rcu(f, &br->hash[i], hlist) {
+			if (num >= maxnum)
+				goto out;
+
+			if (has_expired(br, f))
+				continue;
+
+			/* ignore pseudo entry for local MAC address */
+			if (!f->dst)
+				continue;
+
+			if (skip) {
+				--skip;
+				continue;
+			}
+
+			/* convert from internal format to API */
+			ether_addr_copy(fe->mac_addr, f->addr.addr);
+			fe->nick = ntohs(f->nick);
+			/* due to ABI compat need to split into hi/lo */
+			fe->port_no = f->dst->port_no;
+			fe->port_hi = f->dst->port_no >> 8;
+
+			fe->is_local = f->is_local;
+			if (!f->is_static)
+				fe->ageing_timer_value =
+				jiffies_to_clock_t(jiffies - f->updated);
+			++fe;
+			++num;
+		}
+	}
+
+ out:
+	rcu_read_unlock();
+	return num;
+}
+#endif
+
 static struct net_bridge_fdb_entry *fdb_find(struct hlist_head *head,
 					     const unsigned char *addr,
 					     __u16 vid)
