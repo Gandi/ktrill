@@ -42,7 +42,50 @@ int rbr_set_data(struct net_device *dev, struct nlattr *tb[],
 		nick = nla_get_u16(data[IFLA_TRILL_ROOT]);
 		err = set_treeroot(br->rbr, htons(nick));
 	}
+	if (data[IFLA_TRILL_INFO]) {
+		struct rbr_nickinfo *rbr_ni;
+		struct rbr_node *old;
+		size_t old_size = 0;
+		size_t size = 0;
+		struct rbr *rbr;
 
+		if (!br->rbr)
+			return -EINVAL;
+
+		rbr = br->rbr;
+		size = nla_len(data[IFLA_TRILL_INFO]);
+		rbr_ni = kzalloc(size, GFP_KERNEL);
+		if (!rbr_ni)
+			goto fail;
+		memcpy(rbr_ni, nla_data(data[IFLA_TRILL_INFO]), size);
+		nick = rbr_ni->nick;
+		old = rbr->rbr_nodes[nick];
+		if (old)
+			old_size = RBR_NI_TOTALSIZE(old->rbr_ni);
+		/* replace old node by a new one only if nickname
+		 * information have changed
+		 */
+		if (!old || old_size != size ||
+		    memcmp(old->rbr_ni, rbr_ni, size)) {
+			struct rbr_node *new;
+
+			new = kzalloc(sizeof(*old), GFP_KERNEL);
+			if (!new) {
+				kfree(rbr_ni);
+				goto fail;
+			}
+			atomic_set(&new->refs, 1);
+			new->rbr_ni = rbr_ni;
+			/* Avoid deleting node while it is been used for
+			 * routing
+			 */
+			rcu_assign_pointer(rbr->rbr_nodes[nick], new);
+			if (old)
+				rbr_node_put(old);
+		} else {
+			kfree(rbr_ni);
+		}
+	}
 	return 0;
 fail:
 	pr_warn("rbr_set_data FAILED\n");
