@@ -852,6 +852,7 @@ ssize_t br_show_bridge_id(char *buf, const struct bridge_id *id);
 /* rbr.c */
 #ifdef CONFIG_TRILL
 void br_trill_set_enabled(struct net_bridge *br, unsigned long val);
+rx_handler_result_t rbr_handle_frame(struct sk_buff **pskb);
 #endif
 
 /* br_stp_bpdu.c */

@@ -38,21 +38,28 @@ static struct rbr *add_rbr(struct net_bridge *br)
 
 static void br_trill_start(struct net_bridge *br)
 {
+	struct net_bridge_port *p;
 	/* Disable STP if it is already enabled */
 
 	if (br->stp_enabled != BR_NO_STP)
 		br_stp_set_enabled(br, false);
 	br->rbr = add_rbr(br);
-	if (br->rbr)
+	if (br->rbr) {
+		list_for_each_entry(p, &br->port_list, list) {
+			struct net_device *dev = p->dev;
+
+			rcu_assign_pointer(dev->rx_handler, rbr_handle_frame);
+		}
 		br->trill_enabled = BR_TRILL;
-	else
-		pr_warn("RBridge allocation for bridge '%s' failed\n",
-			br->dev->name);
+		return;
+	}
+	pr_warn("RBridge allocation for bridge '%s' failed\n", br->dev->name);
 }
 
 static void br_trill_stop(struct net_bridge *br)
 {
 	struct rbr *old;
+	struct net_bridge_port *p;
 
 	spin_lock_bh(&br->lock);
 	br->trill_enabled = BR_NO_TRILL;
@@ -60,6 +67,11 @@ static void br_trill_stop(struct net_bridge *br)
 	old = br->rbr;
 	br->rbr = NULL;
 	if (likely(old)) {
+		list_for_each_entry(p, &br->port_list, list) {
+			struct net_device *dev = p->dev;
+
+			rcu_assign_pointer(dev->rx_handler, br_handle_frame);
+		}
 		rbr_del_all(old);
 		kfree(old);
 	}

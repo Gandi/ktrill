@@ -483,7 +483,12 @@ int br_add_if(struct net_bridge *br, struct net_device *dev)
 	if (err)
 		goto err3;
 
-	err = netdev_rx_handler_register(dev, br_handle_frame, p);
+#ifdef CONFIG_TRILL
+	if (br->trill_enabled != BR_NO_TRILL)
+		err = netdev_rx_handler_register(dev, rbr_handle_frame, p);
+	else
+#endif
+		err = netdev_rx_handler_register(dev, br_handle_frame, p);
 	if (err)
 		goto err4;
 
