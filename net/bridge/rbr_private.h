@@ -29,6 +29,8 @@ struct rbr_nickinfo {
 	u16 adjcount;
 	/* Num of distribution tree root nicks chosen by this RBridge */
 	u16 dtrootcount;
+	/* Num of vni supported by this RBridge */
+	u16 vnicount;
 	/* Variable size bytes to store adjacency nicks, distribution
 	 * tree roots. Adjacency nicks and
 	 * distribution tree roots are 16-bit fields.
@@ -78,9 +80,19 @@ struct rbr_node *rbr_find_node(struct rbr *rbr, __u16 nickname);
 #define	RBR_NI_DTROOTNICKSPTR(v) (RBR_NI_ADJNICKSPTR(v) + (v)->adjcount)
 #define	RBR_NI_DTROOTNICK(v, n) (RBR_NI_DTROOTNICKSPTR(v)[(n)])
 
+/* Access vni list in trill_nickinfo
+ * we cast RBR_NI_VNIPTR to u32 pointer to get correct value
+ * in TNI_VLAN  (vni are 32bit size ))
+ */
+#define	RBR_NI_VNIPTR(v) ((u32 *)((u16 *) \
+		(RBR_NI_DTROOTNICKSPTR(v) + (v)->dtrootcount)))
+
+#define RBR_NI_VNI(v, n) ((RBR_NI_VNIPTR(v))[(n)])
+
 #define	RBR_NI_TOTALSIZE(v) (\
 		(sizeof(struct rbr_nickinfo)) + \
 		(sizeof(u16) * (v)->adjcount) + \
-		(sizeof(u16) * (v)->dtrootcount)\
+		(sizeof(u16) * (v)->dtrootcount) + \
+		(sizeof(u32) * (v)->vnicount) \
 		)
 #endif
