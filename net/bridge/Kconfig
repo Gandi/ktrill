@@ -60,3 +60,11 @@ config BRIDGE_VLAN_FILTERING
 	  Say N to exclude this support and reduce the binary size.
 
 	  If unsure, say Y.
+
+config TRILL
+	bool "Enable RBridge capabilities (RFC6325) (EXPERIMENTAL)"
+	depends on BRIDGE
+	default n
+	---help---
+	  enable trill option on bridge to get Rbridge
+	  If unsure, say N.
