@@ -81,3 +81,38 @@ int set_treeroot(struct rbr *rbr, uint16_t treeroot)
 		rbr->treeroot = treeroot;
 	return 0;
 }
+
+struct rbr_node *rbr_find_node(struct rbr *rbr, __u16 nickname)
+{
+	struct rbr_node *rbr_node;
+
+	if (unlikely(!VALID_NICK(nickname)))
+		return NULL;
+	rbr_node = rcu_dereference(rbr->rbr_nodes[nickname]);
+	rbr_node_get(rbr_node);
+
+	return rbr_node;
+}
+
+static void rbr_del_node(struct rbr *rbr, uint16_t nickname)
+{
+	struct rbr_node *rbr_node;
+
+	if (likely(VALID_NICK(nickname))) {
+		rbr_node = rbr->rbr_nodes[nickname];
+		if (likely(rbr_node)) {
+			rcu_assign_pointer(rbr->rbr_nodes[nickname], NULL);
+			rbr_node_put(rbr_node);
+		}
+	}
+}
+
+static void rbr_del_all(struct rbr *rbr)
+{
+	unsigned int i;
+
+	for (i = RBRIDGE_NICKNAME_MIN; i < RBRIDGE_NICKNAME_MAX; i++) {
+		if (likely(rbr->rbr_nodes[i]))
+			rbr_del_node(rbr, i);
+	}
+}

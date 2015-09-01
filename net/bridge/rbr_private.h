@@ -44,7 +44,28 @@ struct rbr {
 	struct net_bridge *br;	/* back pointer */
 };
 
+static inline void rbr_node_free(struct rbr_node *rbr_node)
+{
+	if (likely(rbr_node)) {
+		kfree(rbr_node->rbr_ni);
+		kfree(rbr_node);
+	}
+}
+
+static inline void rbr_node_get(struct rbr_node *rbr_node)
+{
+	if (likely(rbr_node))
+		atomic_inc(&rbr_node->refs);
+}
+
+static inline void rbr_node_put(struct rbr_node *rbr_node)
+{
+	if (rbr_node && unlikely(atomic_dec_and_test(&rbr_node->refs)))
+		rbr_node_free(rbr_node);
+}
+
 int set_treeroot(struct rbr *rbr, uint16_t treeroot);
+struct rbr_node *rbr_find_node(struct rbr *rbr, __u16 nickname);
 
 /* Access the adjacency nick list at the end of rbr_nickinfo */
 #define	RBR_NI_ADJNICKSPTR(v) ((u16 *)((struct rbr_nickinfo *)(v) + 1))
