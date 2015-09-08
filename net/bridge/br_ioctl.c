@@ -303,6 +303,9 @@ static int old_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 				ret = vni_add_port(p, id);
 			else
 				vni_del_port(p);
+#ifdef CONFIG_TRILL_VNT
+			rbr_notify_vni(p->br);
+#endif
 		}
 		return ret;
 	}

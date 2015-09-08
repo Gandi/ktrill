@@ -35,6 +35,9 @@ int rbr_set_data(struct net_device *dev, struct nlattr *tb[],
 		if (VALID_NICK(nick))
 			br->rbr->nick = htons(nick);
 		spin_unlock_bh(&br->lock);
+#ifdef CONFIG_TRILL_VNT
+		rbr_notify_vni(br);
+#endif
 	}
 	if (data[IFLA_TRILL_ROOT]) {
 		if (!br->rbr)
@@ -91,3 +94,79 @@ fail:
 	pr_warn("rbr_set_data FAILED\n");
 	return err;
 }
+
+#ifdef CONFIG_TRILL_VNT
+static int rbr_info_vni(struct sk_buff *skb, struct net_bridge *br,
+		u32 *vnis, size_t vnis_size)
+{
+	struct ifinfomsg *hdr;
+	struct nlmsghdr *nlh;
+
+	nlh = nlmsg_put(skb, 0, 0, RTM_NEWLINK, sizeof(*hdr), 0);
+	if (!nlh)
+		return -EMSGSIZE;
+
+	hdr = nlmsg_data(nlh);
+	hdr->ifi_family = AF_BRIDGE;
+	hdr->__ifi_pad = 0;
+	hdr->ifi_type = br->dev->type;
+	hdr->ifi_index = br->dev->ifindex;
+	hdr->ifi_flags = dev_get_flags(br->dev);
+	hdr->ifi_change = 0;
+
+	if (nla_put(skb, IFLA_TRILL_VNI, vnis_size, vnis))
+		goto nla_put_failure;
+
+	nlmsg_end(skb, nlh);
+	return 0;
+
+nla_put_failure:
+	nlmsg_cancel(skb, nlh);
+	return -EMSGSIZE;
+}
+
+void rbr_notify_vni(struct net_bridge *br)
+{
+	struct net *net = dev_net(br->dev);
+	struct sk_buff *skb;
+	int err = -ENOBUFS;
+	int i = 0;
+	u32 *vnis;
+	struct vni *vni;
+	size_t vnis_size;
+	size_t skb_size;
+
+	list_for_each_entry(vni, &br->vni_list, list)
+		i++;
+	vnis_size = sizeof(*vnis) * i;
+	vnis = kzalloc(vnis_size, GFP_KERNEL);
+	if (!vnis)
+		goto fail;
+	i = 0;
+	list_for_each_entry(vni, &br->vni_list, list) {
+		vnis[i] = (u_int32_t) vni->vni_id;
+		i++;
+	}
+	skb_size = NLMSG_ALIGN(sizeof(struct ifinfomsg)) + vnis_size;
+	skb = nlmsg_new(skb_size, GFP_ATOMIC);
+	if (!skb)
+		goto errout;
+
+	err = rbr_info_vni(skb, br, vnis, vnis_size);
+	if (err < 0) {
+		err = -EMSGSIZE;
+		goto errout;
+	}
+	kfree(vnis);
+
+	rtnl_notify(skb, net, 0, RTNLGRP_TRILL, NULL, GFP_ATOMIC);
+	return;
+
+errout:
+	kfree(vnis);
+	kfree_skb(skb);
+fail:
+	pr_warn("rbr: failed to notify vni list\n");
+	rtnl_set_sk_err(net, RTNLGRP_TRILL, err);
+}
+#endif
