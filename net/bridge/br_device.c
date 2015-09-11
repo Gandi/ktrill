@@ -389,6 +389,7 @@ void br_dev_setup(struct net_device *dev)
 	br->stp_enabled = BR_NO_STP;
 #ifdef CONFIG_TRILL
 	br->trill_enabled = BR_NO_TRILL;
+	br->trill_ready = false;
 #endif
 	br->group_fwd_mask = BR_GROUPFWD_DEFAULT;
 	br->group_fwd_mask_required = BR_GROUPFWD_DEFAULT;

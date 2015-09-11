@@ -63,8 +63,12 @@ int rbr_set_data(struct net_device *dev, struct nlattr *tb[],
 		memcpy(rbr_ni, nla_data(data[IFLA_TRILL_INFO]), size);
 		nick = rbr_ni->nick;
 		old = rbr->rbr_nodes[nick];
-		if (old)
+		if (old) {
 			old_size = RBR_NI_TOTALSIZE(old->rbr_ni);
+			/* we wait the second topology compute */
+			if (unlikely(!br->trill_ready))
+				br->trill_ready = true;
+		}
 		/* replace old node by a new one only if nickname
 		 * information have changed
 		 */

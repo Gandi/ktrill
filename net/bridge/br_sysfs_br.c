@@ -179,6 +179,42 @@ static ssize_t trill_state_store(struct device *d,
 }
 
 static DEVICE_ATTR_RW(trill_state);
+
+static ssize_t trill_ready_show(struct device *d,
+				struct device_attribute *attr, char *buf)
+{
+	struct net_bridge *br = to_bridge(d);
+
+	return sprintf(buf, "%d\n", br->trill_ready);
+}
+
+static ssize_t trill_ready_store(struct device *d,
+				 struct device_attribute *attr, const char *buf,
+				 size_t len)
+{
+	struct net_bridge *br = to_bridge(d);
+	int err;
+	unsigned long val;
+
+	if (!ns_capable(dev_net(br->dev)->user_ns, CAP_NET_ADMIN))
+		return -EPERM;
+
+	err = kstrtoul(buf, 0, &val);
+	if (err)
+		return err;
+
+	if (!rtnl_trylock())
+		return restart_syscall();
+	if (val)
+		br->trill_ready = true;
+	else
+		br->trill_ready = false;
+	rtnl_unlock();
+
+	return len;
+}
+
+static DEVICE_ATTR_RW(trill_ready);
 #endif
 
 static ssize_t group_fwd_mask_show(struct device *d,
@@ -786,6 +822,7 @@ static struct attribute *bridge_attrs[] = {
 	&dev_attr_stp_state.attr,
 #ifdef CONFIG_TRILL
 	&dev_attr_trill_state.attr,
+	&dev_attr_trill_ready.attr,
 #endif
 	&dev_attr_group_fwd_mask.attr,
 	&dev_attr_priority.attr,

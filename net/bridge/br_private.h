@@ -285,6 +285,7 @@ struct net_bridge
 
 #ifdef CONFIG_TRILL
 	bool				trill_enabled;
+	bool				trill_ready;
 	struct rbr			*rbr;
 #endif
 
