@@ -47,6 +47,8 @@
 #define TRILL_FLAG_P2P		0x2
 #define TRILL_FLAG_ACCESS	0x4
 #define TRILL_FLAG_TRUNK	0x8	/* DROP ALL native L2 frame */
+/* we normally need less but we add 64 for alignement */
+#define TRILL_HEADROOM		64
 /* Bridge TRILL state */
 #define BR_NO_TRILL		0	/* no trill  */
 #define BR_TRILL		1	/* trill enabled */
